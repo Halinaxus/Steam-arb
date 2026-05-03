@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Steam Arbitrage Scanner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111827;
+      color: #f9fafb;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      color: #9ca3af;
+      margin-bottom: 20px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    input, button {
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      font-size: 14px;
+    }
+
+    button {
+      cursor: pointer;
+      background: #22c55e;
+      color: #052e16;
+      font-weight: bold;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1f2937;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #374151;
+      text-align: left;
+    }
+
+    th {
+      background: #374151;
+    }
+
+    .profit {
+      color: #22c55e;
+      font-weight: bold;
+    }
+
+    .loss {
+      color: #ef4444;
+      font-weight: bold;
+    }
+
+    .status {
+      margin-bottom: 15px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Steam Arbitrage Scanner</h1>
+  <div class="subtitle">Find Steam card/gem opportunities using live gem sack pricing.</div>
+
+  <div class="controls">
+    <input id="minRoi" type="number" placeholder="Min ROI %" value="0" />
+    <button onclick="loadOpportunities()">Refresh</button>
+    <button onclick="loadProfitableOnly()">Profitable Only</button>
+  </div>
+
+  <div id="status" class="status">Loading...</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>Game</th>
+        <th>Price</th>
+        <th>Gems</th>
+        <th>Gem Value</th>
+        <th>Profit</th>
+        <th>ROI</th>
+      </tr>
+    </thead>
+    <tbody id="results"></tbody>
+  </table>
+
+  <script>
+    async function loadOpportunities(profitableOnly = false) {
+      const minRoi = document.getElementById("minRoi").value || 0;
+      const status = document.getElementById("status");
+      const resultsBody = document.getElementById("results");
+
+      status.textContent = "Loading Steam data...";
+      resultsBody.innerHTML = "";
+
+      try {
+        const url = `/opportunities?min_roi=${minRoi}&profitable_only=${profitableOnly}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        status.textContent = `Found ${data.count} opportunities`;
+
+        if (!data.results || data.results.length === 0) {
+          resultsBody.innerHTML = `
+            <tr>
+              <td colspan="7">No results found.</td>
+            </tr>
+          `;
+          return;
+        }
+
+        data.results.forEach(item => {
+          const profitClass = item.profit >= 0 ? "profit" : "loss";
+
+          const row = `
+            <tr>
+              <td>${item.name}</td>
+              <td>${item.game}</td>
+              <td>$${item.price.toFixed(4)}</td>
+              <td>${item.gems}</td>
+              <td>$${item.gem_value.toFixed(4)}</td>
+              <td class="${profitClass}">$${item.profit.toFixed(4)}</td>
+              <td class="${profitClass}">${item.roi_percent.toFixed(2)}%</td>
+            </tr>
+          `;
+
+          resultsBody.innerHTML += row;
+        });
+
+      } catch (error) {
+        status.textContent = "Error loading data.";
+        console.error(error);
+      }
+    }
+
+    function loadProfitableOnly() {
+      loadOpportunities(true);
+    }
+
+    loadOpportunities();
+  </script>
+</body>
+</html>
