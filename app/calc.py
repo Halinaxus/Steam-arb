@@ -20,9 +20,18 @@ def analyze_items(items):
             "profit": round(profit, 4),
             "roi_percent": round(roi_percent, 2),
             "gem_sack_price": item.get("gem_sack_price"),
-            "gem_value_per_gem": item.get("gem_value_per_gem")
+            "gem_value_per_gem": item.get("gem_value_per_gem"),
         })
 
     results.sort(key=lambda x: x["roi_percent"], reverse=True)
+
+    return results
+
+
+def filter_results(results, min_roi=0, profitable_only=False):
+    if profitable_only:
+        results = [r for r in results if r["profit"] > 0]
+
+    results = [r for r in results if r["roi_percent"] >= min_roi]
 
     return results
