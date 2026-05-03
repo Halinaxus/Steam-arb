@@ -3,13 +3,22 @@ import time
 
 BASE_URL = "https://steamcommunity.com/market/search/render/"
 
-# simple in-memory cache
 CACHE = {
     "data": None,
     "timestamp": 0
 }
 
 CACHE_TTL = 60  # seconds
+
+
+# Add/update these as you verify real gem values by game
+GEM_VALUE_BY_GAME = {
+    "Wallpaper Engine": 20,
+    "Warframe": 20,
+    "WARMODE": 20,
+    "UpGun": 20,
+    "WAVESHAPER": 20,
+}
 
 
 def fetch_market_data(query="trading card", count=30):
@@ -20,7 +29,7 @@ def fetch_market_data(query="trading card", count=30):
         "search_descriptions": 0,
         "sort_column": "price",
         "sort_dir": "asc",
-        "appid": 753,  # Steam community items
+        "appid": 753,
         "norender": 1
     }
 
@@ -29,7 +38,12 @@ def fetch_market_data(query="trading card", count=30):
     }
 
     try:
-        response = requests.get(BASE_URL, params=params, headers=headers, timeout=10)
+        response = requests.get(
+            BASE_URL,
+            params=params,
+            headers=headers,
+            timeout=10
+        )
 
         if response.status_code != 200:
             print("Error fetching data:", response.status_code)
@@ -44,37 +58,35 @@ def fetch_market_data(query="trading card", count=30):
 
 
 def clean_price(price_str):
-    """
-    Converts '$0.10' → 0.10
-    Handles commas and empty values safely
-    """
     try:
         return float(
             price_str.replace("$", "")
-                     .replace(",", "")
-                     .strip()
+            .replace(",", "")
+            .strip()
         )
-    except:
+    except Exception:
         return 0.0
 
 
-def estimate_gems(name):
-    """
-    Placeholder logic.
+def extract_game_name(name):
+    for game in GEM_VALUE_BY_GAME:
+        if game.lower() in name.lower():
+            return game
 
-    Most trading cards give between 10–40 gems.
-    We’ll improve this later with real mappings.
-    """
+    return None
 
+
+def estimate_gems(name, game_name=None):
     name_lower = name.lower()
 
-    # crude heuristics (better than flat 20)
+    game_key = game_name or extract_game_name(name)
+
+    base_gems = GEM_VALUE_BY_GAME.get(game_key, 20)
+
     if "foil" in name_lower:
-        return 40
-    elif "rare" in name_lower:
-        return 30
-    else:
-        return 20
+        return base_gems * 10
+
+    return base_gems
 
 
 def parse_items(raw_items):
@@ -84,16 +96,26 @@ def parse_items(raw_items):
         try:
             name = item.get("name", "Unknown")
 
+            app_name = (
+                item.get("app_name")
+                or item.get("asset_description", {}).get("app_name")
+                or extract_game_name(name)
+                or "Unknown"
+            )
+
             price_str = item.get("sell_price_text", "$0.00")
             price = clean_price(price_str)
 
             if price <= 0:
                 continue
 
+            gems = estimate_gems(name, app_name)
+
             parsed.append({
                 "name": name,
+                "game": app_name,
                 "price": price,
-                "gems": estimate_gems(name)
+                "gems": gems
             })
 
         except Exception:
@@ -103,25 +125,18 @@ def parse_items(raw_items):
 
 
 def get_market_items(force_refresh=False):
-    """
-    Main function used by your API.
-    Includes caching to avoid hitting Steam too often.
-    """
-
     current_time = time.time()
 
-    # return cached data if still valid
     if (
-        not force_refresh and
-        CACHE["data"] is not None and
-        current_time - CACHE["timestamp"] < CACHE_TTL
+        not force_refresh
+        and CACHE["data"] is not None
+        and current_time - CACHE["timestamp"] < CACHE_TTL
     ):
         return CACHE["data"]
 
     raw = fetch_market_data()
     parsed = parse_items(raw)
 
-    # update cache
     CACHE["data"] = parsed
     CACHE["timestamp"] = current_time
 
