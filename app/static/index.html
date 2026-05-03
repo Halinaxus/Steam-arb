@@ -37,6 +37,10 @@
       font-size: 14px;
     }
 
+    input {
+      min-width: 150px;
+    }
+
     button {
       cursor: pointer;
       background: #22c55e;
@@ -81,9 +85,12 @@
 
 <body>
   <h1>Steam Arbitrage Scanner</h1>
-  <div class="subtitle">Find Steam card/gem opportunities using live gem sack pricing.</div>
+  <div class="subtitle">
+    Find Steam card/gem opportunities using live gem sack pricing.
+  </div>
 
   <div class="controls">
+    <input id="searchQuery" type="text" placeholder="Search Steam items" value="trading card" />
     <input id="minRoi" type="number" placeholder="Min ROI %" value="0" />
     <button onclick="loadOpportunities()">Refresh</button>
     <button onclick="loadProfitableOnly()">Profitable Only</button>
@@ -108,7 +115,9 @@
 
   <script>
     async function loadOpportunities(profitableOnly = false) {
+      const query = document.getElementById("searchQuery").value || "trading card";
       const minRoi = document.getElementById("minRoi").value || 0;
+
       const status = document.getElementById("status");
       const resultsBody = document.getElementById("results");
 
@@ -116,11 +125,11 @@
       resultsBody.innerHTML = "";
 
       try {
-        const url = `/opportunities?min_roi=${minRoi}&profitable_only=${profitableOnly}`;
+        const url = `/opportunities?query=${encodeURIComponent(query)}&min_roi=${minRoi}&profitable_only=${profitableOnly}`;
         const response = await fetch(url);
         const data = await response.json();
 
-        status.textContent = `Found ${data.count} opportunities`;
+        status.textContent = `Query: "${data.query}" | Found ${data.count} opportunities`;
 
         if (!data.results || data.results.length === 0) {
           resultsBody.innerHTML = `
@@ -159,6 +168,7 @@
       loadOpportunities(true);
     }
 
+    // initial load
     loadOpportunities();
   </script>
 </body>
