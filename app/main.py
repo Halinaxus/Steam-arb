@@ -26,9 +26,15 @@ def health():
 
 
 @app.get("/opportunities")
-def opportunities():
+def opportunities(min_roi: float = 0, profitable_only: bool = False):
     items = get_market_items()
     results = analyze_items(items)
+
+    if profitable_only:
+        results = [r for r in results if r["profit"] > 0]
+
+    results = [r for r in results if r["roi_percent"] >= min_roi]
+
     return {
         "count": len(results),
         "results": results
