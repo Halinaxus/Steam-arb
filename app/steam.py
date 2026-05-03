@@ -5,10 +5,7 @@ from urllib.parse import quote
 BASE_URL = "https://steamcommunity.com/market/search/render/"
 PRICE_OVERVIEW_URL = "https://steamcommunity.com/market/priceoverview/"
 
-CACHE = {
-    "data": None,
-    "timestamp": 0
-}
+CACHE = {}
 
 GEM_PRICE_CACHE = {
     "price": None,
@@ -208,20 +205,24 @@ def parse_items(raw_items):
     return parsed
 
 
-def get_market_items(force_refresh=False):
+def get_market_items(query="trading card", force_refresh=False):
     current_time = time.time()
+
+    cache_key = f"market:{query}"
 
     if (
         not force_refresh
-        and CACHE["data"] is not None
-        and current_time - CACHE["timestamp"] < CACHE_TTL
+        and CACHE.get(cache_key) is not None
+        and current_time - CACHE[cache_key]["timestamp"] < CACHE_TTL
     ):
-        return CACHE["data"]
+        return CACHE[cache_key]["data"]
 
-    raw = fetch_market_data()
+    raw = fetch_market_data(query=query)
     parsed = parse_items(raw)
 
-    CACHE["data"] = parsed
-    CACHE["timestamp"] = current_time
+    CACHE[cache_key] = {
+        "data": parsed,
+        "timestamp": current_time
+    }
 
     return parsed
