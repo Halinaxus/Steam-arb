@@ -48,18 +48,25 @@
       font-weight: bold;
     }
 
+    button.secondary {
+      background: #60a5fa;
+      color: #082f49;
+    }
+
     table {
       width: 100%;
       border-collapse: collapse;
       background: #1f2937;
       border-radius: 10px;
       overflow: hidden;
+      margin-bottom: 30px;
     }
 
     th, td {
       padding: 12px;
       border-bottom: 1px solid #374151;
       text-align: left;
+      font-size: 14px;
     }
 
     th {
@@ -80,23 +87,31 @@
       margin-bottom: 15px;
       color: #9ca3af;
     }
+
+    .section-title {
+      margin-top: 30px;
+      margin-bottom: 10px;
+    }
   </style>
 </head>
 
 <body>
   <h1>Steam Arbitrage Scanner</h1>
   <div class="subtitle">
-    Find Steam card/gem opportunities using live gem sack pricing.
+    Find Steam card/gem/booster opportunities using live gem sack pricing.
   </div>
 
   <div class="controls">
     <input id="searchQuery" type="text" placeholder="Search Steam items" value="trading card" />
     <input id="minRoi" type="number" placeholder="Min ROI %" value="0" />
-    <button onclick="loadOpportunities()">Refresh</button>
-    <button onclick="loadProfitableOnly()">Profitable Only</button>
+    <button onclick="loadCardOpportunities()">Card Scan</button>
+    <button onclick="loadCardProfitableOnly()">Cards: Profitable Only</button>
+    <button class="secondary" onclick="loadBoosterOpportunities()">Booster Scan</button>
+    <button class="secondary" onclick="loadBoosterProfitableOnly()">Boosters: Profitable Only</button>
   </div>
 
-  <div id="status" class="status">Loading...</div>
+  <h2 class="section-title">Card → Gems</h2>
+  <div id="cardStatus" class="status">Click Card Scan to load data.</div>
 
   <table>
     <thead>
@@ -110,18 +125,48 @@
         <th>ROI</th>
       </tr>
     </thead>
-    <tbody id="results"></tbody>
+    <tbody id="cardResults"></tbody>
+  </table>
+
+  <h2 class="section-title">Gems → Booster Pack → Sell</h2>
+  <div id="boosterStatus" class="status">Click Booster Scan to load data.</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Game</th>
+        <th>Booster</th>
+        <th>Gem Cost</th>
+        <th>Craft Cost</th>
+        <th>Market Price</th>
+        <th>Net Sale</th>
+        <th>Profit</th>
+        <th>ROI</th>
+        <th>Volume</th>
+      </tr>
+    </thead>
+    <tbody id="boosterResults"></tbody>
   </table>
 
   <script>
-    async function loadOpportunities(profitableOnly = false) {
+    function money(value) {
+      const num = Number(value || 0);
+      return `$${num.toFixed(4)}`;
+    }
+
+    function percent(value) {
+      const num = Number(value || 0);
+      return `${num.toFixed(2)}%`;
+    }
+
+    async function loadCardOpportunities(profitableOnly = false) {
       const query = document.getElementById("searchQuery").value || "trading card";
       const minRoi = document.getElementById("minRoi").value || 0;
 
-      const status = document.getElementById("status");
-      const resultsBody = document.getElementById("results");
+      const status = document.getElementById("cardStatus");
+      const resultsBody = document.getElementById("cardResults");
 
-      status.textContent = "Loading Steam data...";
+      status.textContent = "Loading card data...";
       resultsBody.innerHTML = "";
 
       try {
@@ -129,14 +174,10 @@
         const response = await fetch(url);
         const data = await response.json();
 
-        status.textContent = `Query: "${data.query}" | Found ${data.count} opportunities`;
+        status.textContent = `Query: "${data.query}" | Found ${data.count} card opportunities`;
 
         if (!data.results || data.results.length === 0) {
-          resultsBody.innerHTML = `
-            <tr>
-              <td colspan="7">No results found.</td>
-            </tr>
-          `;
+          resultsBody.innerHTML = `<tr><td colspan="7">No card results found.</td></tr>`;
           return;
         }
 
@@ -147,11 +188,11 @@
             <tr>
               <td>${item.name}</td>
               <td>${item.game}</td>
-              <td>$${item.price.toFixed(4)}</td>
+              <td>${money(item.price)}</td>
               <td>${item.gems}</td>
-              <td>$${item.gem_value.toFixed(4)}</td>
-              <td class="${profitClass}">$${item.profit.toFixed(4)}</td>
-              <td class="${profitClass}">${item.roi_percent.toFixed(2)}%</td>
+              <td>${money(item.gem_value)}</td>
+              <td class="${profitClass}">${money(item.profit)}</td>
+              <td class="${profitClass}">${percent(item.roi_percent)}</td>
             </tr>
           `;
 
@@ -159,17 +200,68 @@
         });
 
       } catch (error) {
-        status.textContent = "Error loading data.";
+        status.textContent = "Error loading card data.";
         console.error(error);
       }
     }
 
-    function loadProfitableOnly() {
-      loadOpportunities(true);
+    function loadCardProfitableOnly() {
+      loadCardOpportunities(true);
     }
 
-    // initial load
-    loadOpportunities();
+    async function loadBoosterOpportunities(profitableOnly = false) {
+      const minRoi = document.getElementById("minRoi").value || 0;
+
+      const status = document.getElementById("boosterStatus");
+      const resultsBody = document.getElementById("boosterResults");
+
+      status.textContent = "Loading booster data...";
+      resultsBody.innerHTML = "";
+
+      try {
+        const url = `/booster-opportunities?min_roi=${minRoi}&profitable_only=${profitableOnly}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        status.textContent = `Found ${data.count} booster opportunities`;
+
+        if (!data.results || data.results.length === 0) {
+          resultsBody.innerHTML = `<tr><td colspan="9">No booster results found.</td></tr>`;
+          return;
+        }
+
+        data.results.forEach(item => {
+          const profitClass = item.profit >= 0 ? "profit" : "loss";
+
+          const row = `
+            <tr>
+              <td>${item.game}</td>
+              <td>${item.market_hash_name}</td>
+              <td>${item.booster_gem_cost}</td>
+              <td>${money(item.craft_cost)}</td>
+              <td>${money(item.booster_market_price)}</td>
+              <td>${money(item.estimated_net_sale)}</td>
+              <td class="${profitClass}">${money(item.profit)}</td>
+              <td class="${profitClass}">${percent(item.roi_percent)}</td>
+              <td>${item.volume}</td>
+            </tr>
+          `;
+
+          resultsBody.innerHTML += row;
+        });
+
+      } catch (error) {
+        status.textContent = "Error loading booster data.";
+        console.error(error);
+      }
+    }
+
+    function loadBoosterProfitableOnly() {
+      loadBoosterOpportunities(true);
+    }
+
+    loadCardOpportunities();
+    loadBoosterOpportunities();
   </script>
 </body>
 </html>
