@@ -1,4 +1,7 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 from app.steam import get_market_items
 from app.calc import analyze_items
 
@@ -8,16 +11,12 @@ app = FastAPI(
     version="0.1.0"
 )
 
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 
 @app.get("/")
-def root():
-    return {
-        "message": "Steam Arbitrage API running",
-        "endpoints": {
-            "opportunities": "/opportunities",
-            "health": "/health"
-        }
-    }
+def frontend():
+    return FileResponse("app/static/index.html")
 
 
 @app.get("/health")
